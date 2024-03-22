@@ -28,6 +28,14 @@ def module(window, name, orientation, x, y):
 
         load_text_y = load_y1 + HEIGHT / 2 + 4
 
+        rpm_x1 = load_x1 + 1.5 * OUTSET + 2 * HEIGHT
+        rpm_y1 = OUTSET + WIDTH / 2 - HEIGHT
+
+        rpm_x2 = load_x2 - 1.5 * OUTSET - 2 * HEIGHT
+        rpm_y2 = OUTSET + WIDTH / 2
+
+        rpm_text_y = rpm_y2 - HEIGHT / 2
+
         extent = -180
     else:
         temperature_x1 = OUTSET
@@ -44,6 +52,14 @@ def module(window, name, orientation, x, y):
 
         load_text_y = load_y2 - HEIGHT / 2 - 4
 
+        rpm_x1 = load_x1 + 1.5 * OUTSET + 2 * HEIGHT
+        rpm_y1 = MODULE_HEIGHT - OUTSET - WIDTH / 2
+
+        rpm_x2 = load_x2 - 1.5 * OUTSET - 2 * HEIGHT
+        rpm_y2 = MODULE_HEIGHT - OUTSET - WIDTH / 2 + HEIGHT
+
+        rpm_text_y = rpm_y2 - HEIGHT / 2
+
         extent = 180
 
     temperature = module.create_rectangle(temperature_x1, temperature_y1, temperature_x2, temperature_y2, fill="green")
@@ -52,33 +68,42 @@ def module(window, name, orientation, x, y):
 
     temperature_text = module.create_text(MODULE_WIDTH / 2, temperature_y1 + HEIGHT / 2, text="0°C", fill="black", font=("Squares Bold", 24))
     
-    load = module.create_arc(load_x1, load_y1, load_x2, load_y2)
-    module.itemconfigure(load, fill="green")
-    module.itemconfigure(load, start=180, extent=extent)
+    load = module.create_arc(load_x1, load_y1, load_x2, load_y2, fill="green", start=180, extent=extent)
 
-    border = module.create_arc(load_x1, load_y1, load_x2, load_y2)
-    module.itemconfigure(border, outline="white", width=4)
-    module.itemconfigure(border, start=180, extent=extent)
+    module.create_arc(load_x1, load_y1, load_x2, load_y2, outline="white", width=4, start=180, extent=extent)
     
-    background = module.create_arc(load_x1 + HEIGHT + OUTSET / 2, load_y1 + HEIGHT + OUTSET / 2, load_x2 - HEIGHT - OUTSET / 2, load_y2 - HEIGHT - OUTSET / 2)
-    module.itemconfigure(background, fill="black", outline="white", width=4)
-    module.itemconfigure(background, start=180, extent=extent)
+    module.create_arc(load_x1 + HEIGHT + OUTSET / 2, load_y1 + HEIGHT + OUTSET / 2, load_x2 - HEIGHT - OUTSET / 2, load_y2 - HEIGHT - OUTSET / 2, fill="black", outline="white", width=4, start=180, extent=extent)
 
     load_text = module.create_text(MODULE_WIDTH / 2, load_text_y, text="0%", fill="white", font=("Squares Bold", 24))
 
-    module.create_text(MODULE_WIDTH / 2, 160, text=name, fill="white", font=("Squares Bold", 48))
+    module.create_rectangle(load_x1 + HEIGHT + OUTSET / 2 + 3, load_y1 + WIDTH / 2 - 2, load_x2 - HEIGHT - OUTSET / 2 - 3, load_y2 - WIDTH / 2 + 2, fill="black")
 
-    data = {"module":module, "orientation":orientation, "temperature":{"module":temperature, "x1":temperature_x1, "y1":temperature_y1, "x2":temperature_x2, "y2":temperature_y2, "text":temperature_text}, "load":{"module":load, "x1":load_x1, "y1":load_y1, "x2":load_x2, "y2":load_y2, "text":load_text, "extent":extent}}
+    rpm = module.create_rectangle(rpm_x1, rpm_y1, rpm_x2, rpm_y2, fill="green")
+
+    module.create_rectangle(rpm_x1, rpm_y1, rpm_x2, rpm_y2, outline="white", width=4)
+
+    rpm_text = module.create_text(MODULE_WIDTH / 2, rpm_text_y, text="PIPEC RPM", fill="black", font=("Squares Bold", 24))
+
+    if orientation:
+        module.create_text(MODULE_WIDTH / 2, 140, text=name, fill="white", font=("Squares Bold", 48))
+
+        module.create_rectangle(0, load_y1 + WIDTH / 2 + 8, MODULE_WIDTH, load_y2 - WIDTH / 2 + 3, fill="black")
+    else:
+        module.create_text(MODULE_WIDTH / 2, 180, text=name, fill="white", font=("Squares Bold", 48))
+
+        module.create_rectangle(0, load_y1 + WIDTH / 2 - 8, MODULE_WIDTH, load_y2 - WIDTH / 2 - 3, fill="black")
+
+    data = {"module":module, "orientation":orientation, "temperature":{"module":temperature, "x1":temperature_x1, "y1":temperature_y1, "x2":temperature_x2, "y2":temperature_y2, "text":temperature_text}, "load":{"module":load, "x1":load_x1, "y1":load_y1, "x2":load_x2, "y2":load_y2, "text":load_text, "extent":extent}, "rpm":{"module":rpm, "x1":rpm_x1, "y1":rpm_y1, "x2":rpm_x2, "y2":rpm_y2, "text":rpm_text}}
 
     return data
 
 def update(window, gpu_data):
     gpu_info = subprocess.check_output(["nvidia-smi", "--format=csv", "--query-gpu=utilization.gpu,temperature.gpu,fan.speed"]).decode("utf-8")
-    gpu_load, gpu_temperature, gpu_fan_speed = gpu_info.split("\r\n")[1].split(", ")
+    gpu_load, gpu_temperature, gpu_rpm = gpu_info.split("\r\n")[1].split(", ")
 
     gpu_load = int(gpu_load.split()[0])
     gpu_temperature = int(gpu_temperature.split()[0])
-    gpu_fan_speed = int(gpu_fan_speed.split()[0])
+    gpu_rpm = int(gpu_rpm.split()[0])
 
     if gpu_temperature < 70:
         gpu_temperature_module_color = "green"
@@ -111,6 +136,21 @@ def update(window, gpu_data):
         gpu_data["module"].itemconfigure(gpu_data["load"]["module"], fill=gpu_load_module_color, extent=int(180 * gpu_load / 100))
 
     gpu_data["module"].itemconfigure(gpu_data["load"]["text"], fill=gpu_load_text_color, text=f"{gpu_load}%")
+
+    if gpu_rpm < 70:
+        gpu_rpm_module_color = "green"
+        gpu_rpm_text_color = "white"
+    elif gpu_rpm < 90:
+        gpu_rpm_module_color = "yellow"
+        gpu_rpm_text_color = "black"
+    else:
+        gpu_rpm_module_color = "red"
+        gpu_rpm_text_color = "black"
+
+    gpu_data["module"].coords(gpu_data["rpm"]["module"], gpu_data["rpm"]["x1"], gpu_data["rpm"]["y1"], int(WIDTH * gpu_rpm / 100), gpu_data["rpm"]["y2"])
+    gpu_data["module"].itemconfigure(gpu_data["rpm"]["module"], fill=gpu_rpm_module_color)
+
+    gpu_data["module"].itemconfigure(gpu_data["rpm"]["text"], fill=gpu_rpm_text_color, text=f"PIPEC {gpu_rpm}% RPM")
 
     window.after(256, update, window, gpu_data)
 
